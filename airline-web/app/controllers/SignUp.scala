@@ -25,6 +25,18 @@ import play.api.libs.json.JsValue
 import play.api.libs.json.JsObject
 import play.api.libs.json.JsNumber
 import play.api.libs.json.JsString
+import com.typesafe.config.ConfigFactory
+
+object SignUp {
+  /**
+    * reCAPTCHA only works on the domain the site key is registered for, so it has to be switched off
+    * (recaptcha.enabled=false / RECAPTCHA_ENABLED=false) when running the game locally.
+    */
+  lazy val recaptchaEnabled : Boolean = {
+    val config = ConfigFactory.load()
+    !config.hasPath("recaptcha.enabled") || config.getBoolean("recaptcha.enabled")
+  }
+}
 
 class SignUp @Inject()(cc: ControllerComponents)(ws: WSClient) extends AbstractController(cc) with play.api.i18n.I18nSupport {
   private[this] val recaptchaUrl = "https://www.google.com/recaptcha/api/siteverify"
@@ -114,7 +126,7 @@ class SignUp @Inject()(cc: ControllerComponents)(ws: WSClient) extends AbstractC
       // Form has errors, redisplay it
       errors => BadRequest(html.signup(errors)), { userInput =>
         
-        if (isValidRecaptcha(userInput.recaptchaToken)) {
+        if (!SignUp.recaptchaEnabled || isValidRecaptcha(userInput.recaptchaToken)) {
           // We got a valid User value, display the summary
           val user = User(userInput.username, userInput.email, Calendar.getInstance, Calendar.getInstance, UserStatus.ACTIVE, level = 0, None, List.empty)
           UserSource.saveUser(user)

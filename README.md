@@ -11,6 +11,9 @@ Version 2 alpha at https://v2.airline-club.com
 
 
 
+## Quick local play (single-player)
+Want to just play on your own machine, at your own speed? With Docker installed, run `docker compose up --build` and open http://localhost:9000. See [LOCAL_PLAY.md](LOCAL_PLAY.md) for details, including how to change the game speed.
+
 ## Setup
 1. install git :D of course
 1. clone this repo ;D , to setup for V2 use `git checkout v2`

@@ -1,0 +1,6 @@
+.git
+**/target
+**/logs
+**/.idea
+**/.bsp
+airline-web/google-tokens

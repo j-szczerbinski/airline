@@ -17,7 +17,10 @@
 	<link rel="stylesheet" type="text/css" href="@routes.Assets.versioned("stylesheets/mobile.css")">
 	<script src="@routes.Assets.versioned("javascripts/libs/jquery-2.1.4.js")"></script>
     <script src="@routes.Assets.versioned("javascripts/libs/jquery.cookie.js")"></script>
+	@if(controllers.SignUp.recaptchaEnabled) {
 	<script src='https://www.google.com/recaptcha/api.js?render=6Ldno_YjAAAAAA2tRLAayuJOxBxUe9vWyo1IK8h-'></script>
+	}
+	<script>var recaptchaEnabled = @controllers.SignUp.recaptchaEnabled;</script>
 	<script src="@routes.Assets.versioned("javascripts/signup.js")"></script>
 	<script>
 		window['_fs_debug'] = false;

@@ -22,6 +22,12 @@ $( document ).ready(function() {
 })
 
 function signup(form) {
+	if (typeof recaptchaEnabled !== 'undefined' && !recaptchaEnabled) { //e.g. running locally
+		$('body .loadingSpinner').show()
+		form.append('<input type="hidden" name="recaptchaToken" value="disabled" />');
+		form.submit()
+		return
+	}
 	grecaptcha.ready(function() {
 		grecaptcha.execute('6Ldno_YjAAAAAA2tRLAayuJOxBxUe9vWyo1IK8h-', {action: 'signup'})
 			.then(function(token) {

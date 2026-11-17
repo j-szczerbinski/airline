@@ -1,0 +1,55 @@
+# Run your own private copy of the game locally:
+#   docker compose up --build
+# then open http://localhost:9000  (see LOCAL_PLAY.md)
+services:
+  db:
+    image: mysql:5.7
+    platform: linux/amd64   # mysql 5.7 has no ARM image; runs emulated on Apple Silicon
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: airline_v2_1
+      MYSQL_USER: sa
+      MYSQL_PASSWORD: admin
+      MYSQL_ROOT_PASSWORD: admin
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --max_allowed_packet=256M
+      - --innodb_buffer_pool_size=512M
+    volumes:
+      - airline-db:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-padmin"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  simulation:
+    build: .
+    image: airline-local
+    restart: unless-stopped
+    command: /app/local/start-simulation.sh
+    environment:
+      MYSQL_HOST: db:3306
+      # Real seconds per game week. The online servers use 600 (10 minutes).
+      CYCLE_DURATION_SECONDS: ${CYCLE_DURATION_SECONDS:-60}
+    ports:
+      - "9000:9000"   # the web server shares this container's network
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    image: airline-local
+    restart: unless-stopped
+    command: /app/local/start-web.sh
+    network_mode: "service:simulation"   # talks to the simulation on localhost, like on the real server
+    environment:
+      MYSQL_HOST: db:3306
+      GOOGLE_MAP_KEY: ${GOOGLE_MAP_KEY:-}
+      RECAPTCHA_ENABLED: "false"   # the captcha only works on the live site's domain
+    depends_on:
+      - simulation
+
+volumes:
+  airline-db:

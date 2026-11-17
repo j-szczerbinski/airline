@@ -317,6 +317,7 @@ object Meta {
     createUserModifier(connection)
     createAllianceLabelColor(connection)
     createAirportAsset(connection)
+    createAllianceMission(connection)
 
     statement = connection.prepareStatement("CREATE TABLE " + AIRPORT_CITY_SHARE_TABLE + "(" +
       "airport INTEGER," +

@@ -4,6 +4,7 @@ package com.patson
 
 import java.util.concurrent.TimeUnit
 import akka.actor.Props
+import com.typesafe.config.ConfigFactory
 import akka.actor.Actor
 import com.patson.data._
 import com.patson.stream.{CycleCompleted, CycleStart, SimulationEventStream}
@@ -14,7 +15,16 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.Duration
 
 object MainSimulation extends App {
-  val CYCLE_DURATION : Int = 10 * 60
+  /**
+    * Real-time seconds between the start of one cycle (game week) and the next.
+    * The public servers use 10 minutes. For a local/single-player game set
+    * `airline.cycle-duration-seconds` (or the CYCLE_DURATION_SECONDS env var) to something
+    * much lower; 0 means "run the next week as soon as the previous one finishes".
+    */
+  val CYCLE_DURATION : Int = {
+    val config = ConfigFactory.load()
+    if (config.hasPath("airline.cycle-duration-seconds")) config.getInt("airline.cycle-duration-seconds") else 10 * 60
+  }
   var currentWeek: Int = 0
 
 //  implicit val actorSystem = ActorSystem("rabbit-akka-stream")
@@ -26,8 +36,9 @@ object MainSimulation extends App {
   mainFlow
   
   def mainFlow() = {
+    println(s"Cycle duration is $CYCLE_DURATION second(s)")
     val actor = actorSystem.actorOf(Props[MainSimulationActor])
-    actorSystem.scheduler.schedule(Duration.Zero, Duration(CYCLE_DURATION, TimeUnit.SECONDS), actor, Start)
+    actor ! Start
     Await.result(actorSystem.whenTerminated, Duration.Inf)
   }
 
@@ -121,17 +132,28 @@ object MainSimulation extends App {
     currentWeek = CycleSource.loadCycle()
     def receive = {
       case Start =>
-        status = SimulationStatus.IN_PROGRESS
-        val endTime = startCycle(currentWeek)
+        val cycleStartTime = System.currentTimeMillis()
+        var succeeded = false
+        try {
+          status = SimulationStatus.IN_PROGRESS
+          val endTime = startCycle(currentWeek)
 
-        currentWeek += 1
-        CycleSource.setCycle(currentWeek)
-        status = SimulationStatus.WAITING_CYCLE_START
-        postCycle(currentWeek) //post cycle do some quick updates, no long simulation
+          currentWeek += 1
+          CycleSource.setCycle(currentWeek)
+          status = SimulationStatus.WAITING_CYCLE_START
+          postCycle(currentWeek) //post cycle do some quick updates, no long simulation
 
-        //notify the websockets via EventStream
-        println("Publish Cycle Complete message")
-        SimulationEventStream.publish(CycleCompleted(currentWeek - 1, endTime), None)
+          //notify the websockets via EventStream
+          println("Publish Cycle Complete message")
+          SimulationEventStream.publish(CycleCompleted(currentWeek - 1, endTime), None)
+          succeeded = true
+        } finally {
+          //schedule the next cycle only after this one is done (even if it failed), so slow cycles never pile up in the mailbox
+          val elapsed = System.currentTimeMillis() - cycleStartTime
+          val minimumDelay = if (succeeded) 0L else 10000L //avoid a tight retry loop if the cycle keeps failing
+          val delay = Math.max(minimumDelay, CYCLE_DURATION * 1000L - elapsed)
+          context.system.scheduler.scheduleOnce(Duration(delay, TimeUnit.MILLISECONDS), self, Start)
+        }
     }
   }
    
